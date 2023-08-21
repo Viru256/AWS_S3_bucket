@@ -10,6 +10,16 @@ UPLOAD_FOLDER = "C:/Users/virajhumbre/Desktop/S3/"
 if 'TEMPLATES' not in st.session_state:
     st.session_state.TEMPLATES = {}
 
+DATA_TYPE_MAPPING = {
+    'object': 'object',
+    'integer': 'int64',
+    'float': 'float64',
+    'date': 'datetime64'
+}
+
+DATA_TYPE_OPTIONS = ['object', 'int64', 'float64', 'datetime64']
+
+
 def create_or_edit_template(folder_name):
     st.write(f"Create/Edit template for '{folder_name}'")
     template = st.session_state.TEMPLATES.get(folder_name, {'columns': [], 'data_types': []})
@@ -20,15 +30,39 @@ def create_or_edit_template(folder_name):
         template['columns'].append('')
         template['data_types'].append('object')  # Default data type to 'object'
 
+    new_columns = []  # Store new column names for the template
+    new_data_types = []  # Store new data type strings for the template columns
+
     for i, column in enumerate(template['columns']):
         col_name = st.text_input(f"Column {i+1} Name", column)
-        col_data_type = st.selectbox(f"Column {i+1} Data Type", ['object', 'int', 'float64', 'date'], index=['object', 'int', 'float64', 'date'].index(template['data_types'][i]))
+        col_data_type = st.text_area(f"Column {i+1} Data Type", template['data_types'][i].strip())  # Remove extra whitespace
 
-        template['columns'][i] = col_name
-        template['data_types'][i] = col_data_type
+        new_columns.append(col_name)
+        new_data_types.append(col_data_type)
+
+    template['columns'] = new_columns  # Update column names in the template
+    template['data_types'] = new_data_types  # Update data types in the template
 
     st.session_state.TEMPLATES[folder_name] = {'columns': template['columns'], 'data_types': template['data_types']}
 
+
+
+
+
+def append_data_to_folder_file(folder_path, data_to_append):
+    file_path = os.path.join(folder_path, "combined_data_1.csv")
+
+    if os.path.exists(file_path):
+        existing_data = pd.read_csv(file_path)
+        combined_data = pd.concat([existing_data, data_to_append], ignore_index=True)
+    else:
+        combined_data = data_to_append
+
+    combined_data.to_csv(file_path, index=False)
+
+def overwrite_data_in_folder_file(folder_path, data_to_overwrite):
+    file_path = os.path.join(folder_path, "combined_data.csv")
+    data_to_overwrite.to_csv(file_path, index=False)
 
 def validate_uploaded_columns_and_data_types(uploaded_df, template):
     uploaded_columns = list(uploaded_df.columns)
@@ -109,6 +143,13 @@ def main():
                 if validate_uploaded_columns_and_data_types(uploaded_df, template):
                     with open(os.path.join(UPLOAD_FOLDER, selected_option, uploaded_file.name), 'wb') as f:
                         f.write(uploaded_file.read())
+                    # Append data to the respective folder's combined file
+                    folder_path = os.path.join(UPLOAD_FOLDER, selected_option)
+                    append_data_to_folder_file(folder_path, uploaded_df)
+
+                    # Overwrite data in the sales data folder's combined file
+                    folder_path = os.path.join(UPLOAD_FOLDER, selected_option)
+                    overwrite_data_in_folder_file(folder_path, uploaded_df)
                     st.success('File uploaded successfully')
                 else:
                     st.error("Column names and/or data types of the uploaded file do not match the template.")
